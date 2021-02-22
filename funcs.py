@@ -12,9 +12,9 @@ def initialize_H(height, width, D, img_L, img_R):
     H = np.zeros((height, width, len(D)), dtype=np.float32)
     for y in range(0, height):
         for x in range(0, width):
-            for d_ind, d in enumerate(D):
-                if 0<= y-d[0] < height and 0<= x-d[1] <width:
-                    H[y, x, d_ind] = abs( img_L[y,x] - img_R[y - d[0], x - d[1]] )
+            for d_ind in range(D.shape[0]):
+                if 0<= y-D[d_ind][0] < height and 0<= x-D[d_ind][1] <width:
+                    H[y, x, d_ind] = abs( img_L[y,x] - img_R[y - D[d_ind][0], x - D[d_ind][1]] )
                 else:
                     H[y, x, d_ind] = np.inf # Weird results
     return H
@@ -24,9 +24,9 @@ def initialize_H(height, width, D, img_L, img_R):
 def initialize_G(D, alpha=1):
     
     G = np.zeros((len(D), len(D)), dtype=np.float32)
-    for d1_ind, d1 in enumerate(D):
-        for d2_ind, d2 in enumerate(D):
-            G[d1_ind, d2_ind] = (d1[0] - d2[0])**2 + (d1[1] - d2[1])**2
+    for d1_ind in range(D.shape[0]):
+        for d2_ind in range(D.shape[0]):
+            G[d1_ind, d2_ind] = (D[d1_ind][0] - D[d2_ind][0])**2 + (D[d1_ind][1] - D[d2_ind][1])**2
             
     return G
 
@@ -38,7 +38,7 @@ def init_left_part(height, width, D, H, G):
 
     for y in range(0, height):
         for x in range(0, width):
-            for d_ind, d in enumerate(D):
+            for d_ind in range(D.shape[0]):
                 Li[y, x, d_ind] = left(y, x, d_ind, Li, D, H, G)
     return Li
 
@@ -50,7 +50,7 @@ def left(y, x, d_ind, Li, D, H, G):
     else:
         minl = np.inf
 
-        for d2_ind, d2 in enumerate(D):
+        for d2_ind in range(D.shape[0]):
             temp = Li[y, x-1, d2_ind] + H[y, x-1, d2_ind] + G[d_ind, d2_ind]
             if temp < minl:
                 minl = temp
@@ -65,19 +65,19 @@ def init_right_part(height, width, D, H, G):
 
     for y in range(height-1, -1):
         for x in range(width-1, -1):
-            for d_ind, d in enumerate(D):
-                Ri[y, x, d_ind] = right(y, x, d_ind, Ri, D, H, G)
+            for d_ind in range(D.shape[0]):
+                Ri[y, x, d_ind] = right(y, x, d_ind, Ri, D, H, G, width)
     return Ri
 
 @njit
-def right(y, x, d_ind, Ri, D, H, G):
+def right(y, x, d_ind, Ri, D, H, G, width):
 
     if x == width-1:
         return 0
     else:
         minl = np.inf
 
-        for d2_ind, d2 in enumerate(D):
+        for d2_ind in range(D.shape[0]):
             temp = Ri[y, x+1, d2_ind] + H[y, x+1, d2_ind] + G[d_ind, d2_ind]
             if temp < minl:
                 minl = temp
@@ -92,7 +92,7 @@ def init_top_part(height, width, D, H, G):
 
     for y in range(0, height):
         for x in range(0, width):
-            for d_ind, d in enumerate(D):
+            for d_ind in range(D.shape[0]):
                 Ui[y, x, d_ind] = up(y, x, d_ind, Ui, D, H, G)
     return Ui
 
@@ -104,7 +104,7 @@ def up(y, x, d_ind, Ui, D, H, G):
     else:
         minl = np.inf
 
-        for d2_ind, d2 in enumerate(D):
+        for d2_ind in range(D.shape[0]):
             temp = Ui[y-1, x, d2_ind] + H[y-1, x, d2_ind] + G[d_ind, d2_ind]
             if temp < minl:
                 minl = temp
@@ -119,19 +119,19 @@ def init_bottom_part(height, width, D, H, G):
 
     for y in range(height-1, -1):
         for x in range(width-1, -1):
-            for d_ind, d in enumerate(D):
-                Di[y, x, d_ind] = right(y, x, d_ind, Di, D, H, G)
+            for d_ind in range(D.shape[0]):
+                Di[y, x, d_ind] = right(y, x, d_ind, Di, D, H, G, height)
     return Di
 
 @njit
-def right(y, x, d_ind, Di, D, H, G):
+def right(y, x, d_ind, Di, D, H, G, height):
 
     if x == height-1:
         return 0
     else:
         minl = np.inf
 
-        for d2_ind, d2 in enumerate(D):
+        for d2_ind in range(D.shape[0]):
             temp = Di[y+1, x, d2_ind] + H[y+1, x, d2_ind] + G[d_ind, d2_ind]
             if temp < minl:
                 minl = temp
@@ -140,7 +140,7 @@ def right(y, x, d_ind, Di, D, H, G):
 
 
 #@njit
-def reconstruct(height, width, Li, Ri, Ui, Di, H):
+def reconstruct(height, width, Li, Ri, Ui, Di, H, D):
     
     Res = np.zeros((height, width), dtype=np.uint8)
     
@@ -148,7 +148,7 @@ def reconstruct(height, width, Li, Ri, Ui, Di, H):
         for x in range(0, width):
             best_score = np.inf
             best_d = None
-            for d_ind, d in enumerate(D):
+            for d_ind in range(D.shape[0]):
                 temp = Li[y, x, d_ind] + Ui[y, x, d_ind] + H[y, x, d_ind] + Ri[y, x, d_ind] + Di[y, x, d_ind]
                 if temp < best_score:
                     best_score = temp
